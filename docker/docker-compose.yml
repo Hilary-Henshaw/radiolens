@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../model:/app/model:ro
+    environment:
+      - PORT=8000
+      - RADIOLENS_MODEL_WEIGHTS_PATH=model/best_weights.keras
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../model:/app/model:ro
+    environment:
+      - RADIOLENS_MODEL_WEIGHTS_PATH=model/best_weights.keras
+    depends_on:
+      api:
+        condition: service_healthy
