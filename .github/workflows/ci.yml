@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Check formatting
+        run: ruff format --check src/ tests/ scripts/ app/
+      - name: Check linting
+        run: ruff check src/ tests/ scripts/ app/
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install package with dev extras
+        run: pip install -e ".[dev]"
+      - name: Run mypy
+        run: mypy src/radiolens --disable-error-code=type-arg
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package with dev extras
+        run: pip install -e ".[api,dev]"
+      - name: Run fast tests (exclude slow/GPU tests)
+        run: |
+          pytest tests/ -m "not slow" \
+            --cov=radiolens \
+            --cov-report=xml \
+            --cov-fail-under=65
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        if: matrix.python-version == '3.10'
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f docker/Dockerfile.api -t radiolens-api:test .
+      - name: Build Dashboard image
+        run: docker build -f docker/Dockerfile.dashboard -t radiolens-dashboard:test .
