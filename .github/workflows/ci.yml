@@ -60,7 +60,7 @@ jobs:
             --cov-report=xml \
             --cov-fail-under=65
       - name: Upload coverage report
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v6
         if: matrix.python-version == '3.10'
         with:
           file: ./coverage.xml
